@@ -2,6 +2,18 @@ provider "aws" {
     region = "us-west-1"
 }
 
+variable "web_server_port" {
+  type        = number
+  default     = 8080
+  description = "Web server port number"
+}
+
+output "web_server_public_ip" {
+  value       = aws_instance.web_server.public_ip
+  description = "Web server public IP address"
+}
+
+
 data "aws_ami" "ubuntu" {
     filter {
         name = "name"
@@ -17,7 +29,7 @@ resource "aws_instance" "web_server" {
     user_data = <<-EOF
                 #!/bin/bash
                 echo "Hello, World" > index.html
-                nohup busybox httpd -f -p 8080 &
+                nohup busybox httpd -f -p ${var.web_server_port} &
                 EOF
 
     user_data_replace_on_change = true
@@ -31,8 +43,8 @@ resource "aws_security_group" "web_server" {
     name = "ec2-web-server-sg"
 
     ingress {
-        from_port = 8080
-        to_port = 8080
+        from_port = var.web_server_port
+        to_port = var.web_server_port
         protocol = "tcp"
         cidr_blocks = ["0.0.0.0/0"]
     }
