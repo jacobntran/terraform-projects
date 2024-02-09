@@ -15,6 +15,12 @@ data "aws_ami" "ubuntu" {
     }
 }
 
+resource "aws_default_vpc" "default" {
+  tags = {
+    Name = "Default VPC"
+  }
+}
+
 resource "aws_default_subnet" "default_az1" {
     availability_zone = "us-west-1a"
 }
@@ -62,10 +68,81 @@ resource "aws_autoscaling_group" "web_servers" {
         id = aws_launch_template.asg.id
     }
     vpc_zone_identifier = [aws_default_subnet.default_az1.id, aws_default_subnet.default_az2.id]
+    target_group_arns = [aws_lb_target_group.web_servers.arn]
 
     tag {
         key = "name"
         value = "asg-web-server"
         propagate_at_launch = true
+    }
+}
+
+output "lb_endpoint" {
+    value = aws_lb.this.dns_name
+}
+
+resource "aws_security_group" "lb" {
+    name = "lb-sg"
+    
+    ingress {
+        from_port = 80
+        to_port = 80
+        protocol = "tcp"
+        cidr_blocks = ["0.0.0.0/0"]
+    }
+
+    egress {
+        from_port = 0
+        to_port = 0
+        protocol = "-1"
+        cidr_blocks = ["0.0.0.0/0"]
+    }
+
+    tags = {
+        name = "Load Balancer Security Group"
+    }
+}
+
+resource "aws_lb" "this" {
+    load_balancer_type = "application"
+    security_groups = [aws_security_group.lb.id]
+    subnets = [aws_default_subnet.default_az1.id, aws_default_subnet.default_az2.id]
+}
+
+resource "aws_lb_target_group" "web_servers" {
+    name = "web-servers-tg"
+    port = 8080
+    protocol = "HTTP" 
+    vpc_id = aws_default_vpc.default.id
+}
+
+resource "aws_lb_listener" "http" {
+    load_balancer_arn = aws_lb.this.arn
+    port = "80"
+    protocol = "HTTP"
+
+    default_action {
+        type = "fixed-response"
+
+        fixed_response {
+            content_type = "text/plain"
+            message_body = "404: page not found"
+            status_code = 404
+        }
+    }
+}
+
+resource "aws_lb_listener_rule" "all" {
+    listener_arn = aws_lb_listener.http.arn
+
+    action {
+        type = "forward"
+        target_group_arn = aws_lb_target_group.web_servers.arn
+    }
+
+    condition {
+        path_pattern {
+            values = ["*"]
+        }
     }
 }
