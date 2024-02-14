@@ -2,6 +2,16 @@ provider "aws" {
     region = "us-west-1"
 }
 
+# terraform {
+#     backend "s3" {
+#         bucket = "jtran-terraform-state-bucket"
+#         key = "global/s3/terraform.tfstate"
+#         region = "us-west-1"
+#         encrypt = true
+#     }
+# }
+
+
 resource "aws_s3_bucket" "terraform_state" {
     bucket = "jtran-terraform-state-bucket"
 
